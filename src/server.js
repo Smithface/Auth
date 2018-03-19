@@ -2,7 +2,7 @@ const bodyParser = require('body-parser');
 const express = require('express');
 const session = require('express-session');
 const bcrypt = require('bcrypt');
-const User = require('./user.js');
+const User = require('./user');
 
 const STATUS_USER_ERROR = 422;
 const BCRYPT_COST = 11;
@@ -29,47 +29,68 @@ const sendUserError = (err, res) => {
 
 // TODO: implement routes
 server.post('/users', (req, res) => {
+  if (!req.body.password) { sendUserError({ error: 'password required' }, res); }
   const userInfo = {
     username: req.body.username,
     passwordHash: req.body.password
   };
   const newUser = new User(userInfo);
-  bcrypt.hash(newUser.passwordHash, BCRYPT_COST, (err, hash) => {
+  bcrypt.hash(newUser.passwordHash, BCRYPT_COST, (err, passwordHash) => {
     if (err) {
       sendUserError(err, res);
     } else {
-      newUser.passwordHash = hash;
+      newUser.passwordHash = passwordHash;
       newUser.save()
-      .then((user) => {
-        res.status(201).json(user);
-      });
-      // .catch((err) => {
-      //   sendUserError(err, res);
-      // });
+        .then((user) => {
+          res.status(200).json(user);
+        })
+        .catch((catchErr) => {
+          sendUserError(catchErr, res);
+        });
     }
   });
 });
 
-// server.post('/login', (req, res) => {
-//   const { username, password } = req.body;
-//   dataBase.forEach(record => {
-//     if (record.username === username) {
-//       // bcrypt.compare(myPlaintextPassword, hash, (err, res) => {
-//       //   // res == true
-//       // });
-//       if (record.password === password) {
-//         res.json({ success: 'User authenticated' });
-//         return;
-//       } else {
-//         res.status(403).json({ error: 'Not authenticated' });
-//         return;
-//       }
-//     }
-//   });
-// // });
+server.post('/log-in', (req, res) => {
+  const { username, password } = req.body;
+  User
+    .findOne({ username }, '_id passwordHash')
+    .then((user) => {
+      bcrypt.compare(password, user.passwordHash, (err, resp) => {
+        if (!resp) {
+          sendUserError(err, res);
+        } else {
+          res.status(200).json({ success: true });
+        }
+      });
+    })
+    .catch((err) => {
+      // console.log('failure to find the One');
+      sendUserError(err, res);
+    });
+});
+
+const loggedIn = (req, res, next) => {
+  const { username } = req.session;
+  // console.log(req.session);
+  if (!username) {
+    sendUserError('User is not logged in', res);
+    return;
+  }
+  User.findOne({ username }, (err, user) => {
+    if (err) {
+      sendUserError(err, res);
+    } else if (!user) {
+      sendUserError('User does exist', res);
+    } else {
+      req.user = user;
+      next();
+    }
+  });
+};
 
 // TODO: add local middleware to this route to ensure the user is logged in
-server.get('/me', (req, res) => {
+server.get('/me', loggedIn, (req, res) => {
   // Do NOT modify this route handler in any way.
   res.json(req.user);
 });
