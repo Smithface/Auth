@@ -81,7 +81,7 @@ const loggedIn = (req, res, next) => {
     if (err) {
       sendUserError(err, res);
     } else if (!user) {
-      sendUserError('User does exist', res);
+      sendUserError('User does not exist', res);
     } else {
       req.user = user;
       next();
