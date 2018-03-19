@@ -2,6 +2,7 @@ const bodyParser = require('body-parser');
 const express = require('express');
 const session = require('express-session');
 const bcrypt = require('bcrypt');
+const User = require('./user.js');
 
 const STATUS_USER_ERROR = 422;
 const BCRYPT_COST = 11;
@@ -28,8 +29,44 @@ const sendUserError = (err, res) => {
 
 // TODO: implement routes
 server.post('/users', (req, res) => {
-
+  const userInfo = {
+    username: req.body.username,
+    passwordHash: req.body.password
+  };
+  const newUser = new User(userInfo);
+  bcrypt.hash(newUser.passwordHash, BCRYPT_COST, (err, hash) => {
+    if (err) {
+      sendUserError(err, res);
+    } else {
+      newUser.passwordHash = hash;
+      newUser.save()
+      .then((user) => {
+        res.status(201).json(user);
+      });
+      // .catch((err) => {
+      //   sendUserError(err, res);
+      // });
+    }
+  });
 });
+
+// server.post('/login', (req, res) => {
+//   const { username, password } = req.body;
+//   dataBase.forEach(record => {
+//     if (record.username === username) {
+//       // bcrypt.compare(myPlaintextPassword, hash, (err, res) => {
+//       //   // res == true
+//       // });
+//       if (record.password === password) {
+//         res.json({ success: 'User authenticated' });
+//         return;
+//       } else {
+//         res.status(403).json({ error: 'Not authenticated' });
+//         return;
+//       }
+//     }
+//   });
+// // });
 
 // TODO: add local middleware to this route to ensure the user is logged in
 server.get('/me', (req, res) => {
